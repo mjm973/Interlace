@@ -17,6 +17,8 @@ uniform vec2 _resAngSpat;
 uniform float _screenDPMM;
 // Display Resolution
 uniform vec2 _res;
+// Frame Resolution
+uniform vec2 _frameRes;
 // Upsampling factor
 uniform int _upscale;
 
@@ -24,7 +26,7 @@ uniform int _upscale;
 uniform vec2 _lentWidthOff;
 
 // Raw UV Coordinates
-in vec2 texcoord;
+in vec2 texCoord;
 
 // Output Pixel Color
 out vec4 color;
@@ -65,8 +67,7 @@ vec4 cubic(float v) {
 
 // Bicubic interpolator
 // https://groups.google.com/forum/#!topic/comp.graphics.api.opengl/kqrujgJfTxo
-vec4 bicubic(sampler2DRect tex, vec2 texcoord, vec2 texscale)
-{
+vec4 bicubic(sampler2DRect tex, vec2 texcoord, vec2 texscale) {
     float fx = fract(texcoord.x);
     float fy = fract(texcoord.y);
     texcoord.x -= fx;
@@ -75,21 +76,14 @@ vec4 bicubic(sampler2DRect tex, vec2 texcoord, vec2 texscale)
     vec4 xcubic = cubic(fx);
     vec4 ycubic = cubic(fy);
 
-    vec4 c = vec4(texcoord.x - 0.5, texcoord.x + 1.5, texcoord.y -
-0.5, texcoord.y + 1.5);
-    vec4 s = vec4(xcubic.x + xcubic.y, xcubic.z + xcubic.w, ycubic.x +
-ycubic.y, ycubic.z + ycubic.w);
-    vec4 offset = c + vec4(xcubic.y, xcubic.w, ycubic.y, ycubic.w) /
-s;
+    vec4 c = vec4(texcoord.x - 0.5, texcoord.x + 1.5, texcoord.y - 0.5, texcoord.y + 1.5);
+    vec4 s = vec4(xcubic.x + xcubic.y, xcubic.z + xcubic.w, ycubic.x + ycubic.y, ycubic.z + ycubic.w);
+    vec4 offset = c + vec4(xcubic.y, xcubic.w, ycubic.y, ycubic.w) / s;
 
-    vec4 sample0 = texture(tex, vec2(offset.x, offset.z) *
-texscale);
-    vec4 sample1 = texture(tex, vec2(offset.y, offset.z) *
-texscale);
-    vec4 sample2 = texture(tex, vec2(offset.x, offset.w) *
-texscale);
-    vec4 sample3 = texture(tex, vec2(offset.y, offset.w) *
-texscale);
+    vec4 sample0 = texture(tex, vec2(offset.x, offset.z) * texscale);
+    vec4 sample1 = texture(tex, vec2(offset.y, offset.z) * texscale);
+    vec4 sample2 = texture(tex, vec2(offset.x, offset.w) * texscale);
+    vec4 sample3 = texture(tex, vec2(offset.y, offset.w) * texscale);
 
     float sx = s.x / (s.x + s.y);
     float sy = s.z / (s.z + s.w);
@@ -116,13 +110,13 @@ void main() {
   float s = computeS(x, u);
   float index = round(s);
   // Update UV sampling coordinates - Y is unaffected
-  vec2 uv = vec2(u / _res.x, texcoord.y);
+  vec2 uv = vec2(u * _resAngSpat.x / _res.x, texCoord.y);
   // Test validity of the pixel
   float valid = u >= 1 && u <= _resAngSpat.y ? 1 : 0;
 
   // Sample L/R frames
-  vec4 lCol = texture(_left, uv);
-  vec4 rCol = texture(_right, uv);
+  vec4 lCol = downsampleTexture(_left, uv);
+  vec4 rCol = downsampleTexture(_right, uv);
 
   color = mix(lCol, rCol, s / _resAngSpat.x) * valid;
 }
