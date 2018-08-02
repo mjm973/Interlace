@@ -110,7 +110,7 @@ void main() {
   float s = computeS(x, u);
   float index = round(s);
   // Update UV sampling coordinates - Y is unaffected
-  vec2 uv = vec2(u * _resAngSpat.x / _res.x, texCoord.y);
+  vec2 uv = vec2(u * _resAngSpat.x / _res.x, 1 - texCoord.y);
   // Test validity of the pixel
   float valid = u >= 1 && u <= _resAngSpat.y ? 1 : 0;
 
