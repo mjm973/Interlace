@@ -37,6 +37,7 @@ class ofApp : public ofBaseApp{
 		ofxButton fs;
 		ofxToggle debugCalibrate;
 		ofxToggle debugShowInterlaced;
+		ofxToggle bikeTest;
 
 		ofxPanel calGui;
 		ofxToggle lockParams;
@@ -59,7 +60,7 @@ class ofApp : public ofBaseApp{
 		Lightfield lf;
 		Map map;
 
-		ofImage left, right;
+		ofImage left, right, bikeL, bikeR;
 		ofShader interlacer, intResample, calibration;
 		ofShader* activeShader;
 		ofPlanePrimitive plane;

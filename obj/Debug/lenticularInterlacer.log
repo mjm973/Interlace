@@ -1,8 +1,8 @@
 ﻿  ofApp.cpp
-d:\openframeworks\of_v0.10.0_vs2017_release\apps\myapps\lenticularinterlacer\src\ofapp.cpp(176): warning C4018: '<': signed/unsigned mismatch
-d:\openframeworks\of_v0.10.0_vs2017_release\apps\myapps\lenticularinterlacer\src\ofapp.cpp(234): warning C4996: 'ofImage_<unsigned char>::getTextureReference': Use getTexture
+d:\openframeworks\of_v0.10.0_vs2017_release\apps\myapps\lenticularinterlacer\src\ofapp.cpp(179): warning C4018: '<': signed/unsigned mismatch
+d:\openframeworks\of_v0.10.0_vs2017_release\apps\myapps\lenticularinterlacer\src\ofapp.cpp(240): warning C4996: 'ofImage_<unsigned char>::getTextureReference': Use getTexture
   d:\openframeworks\of_v0.10.0_vs2017_release\libs\openframeworks\graphics\ofimage.h(367): note: see declaration of 'ofImage_<unsigned char>::getTextureReference'
-d:\openframeworks\of_v0.10.0_vs2017_release\apps\myapps\lenticularinterlacer\src\ofapp.cpp(235): warning C4996: 'ofImage_<unsigned char>::getTextureReference': Use getTexture
+d:\openframeworks\of_v0.10.0_vs2017_release\apps\myapps\lenticularinterlacer\src\ofapp.cpp(241): warning C4996: 'ofImage_<unsigned char>::getTextureReference': Use getTexture
   d:\openframeworks\of_v0.10.0_vs2017_release\libs\openframeworks\graphics\ofimage.h(367): note: see declaration of 'ofImage_<unsigned char>::getTextureReference'
   lenticularInterlacer.vcxproj -> D:\OpenFrameworks\of_v0.10.0_vs2017_release\apps\myApps\lenticularInterlacer\bin\lenticularInterlacer_debug.exe
   

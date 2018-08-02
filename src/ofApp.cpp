@@ -13,6 +13,7 @@ void ofApp::setup() {
 	gui.add(lockParams.setup("Lock Calib.", false));
 	gui.add(debugCalibrate.setup("Calibrate", false));
 	gui.add(debugShowInterlaced.setup("Debug Interlaced", false));
+	gui.add(bikeTest.setup("BIKE", false));
 
 	// Calibration GUI
 	calGui.setup("Calibration");
@@ -46,6 +47,8 @@ void ofApp::setup() {
 	try {
 		left.load("left.jpg");
 		right.load("right.jpg");
+		bikeL.load("nemo_l.jpg");
+		bikeR.load("nemo_r.jpg");
 	}
 	catch (exception e) {
 		abort = true;
@@ -98,7 +101,7 @@ void ofApp::draw() {
 		debugLens();
 	}
 	// Does the actual rendering magic
-	else if (debugShowInterlaced || debugCalibrate) {
+	else if (debugShowInterlaced || debugCalibrate || bikeTest) {
 		renderShader();
 	}
 
@@ -230,9 +233,12 @@ void ofApp::printParams() {
 
 // Passes on parameters to the shaders as Uniform variables
 void ofApp::setUniforms(ofShader* shader) {
+	ofImage* l = bikeTest ? &bikeL : &left;
+	ofImage* r = bikeTest ? &bikeR : &right;
+
 	// Viewpoints
-	shader->setUniformTexture("_left", left.getTextureReference(), 0);
-	shader->setUniformTexture("_right", right.getTextureReference(), 1);
+	shader->setUniformTexture("_left", l->getTextureReference(), 0);
+	shader->setUniformTexture("_right", r->getTextureReference(), 1);
 
 	// Angular and Spatial Resolution
 	shader->setUniform2f("_resAngSpat", ofVec2f(lf.angularRes, lf.spatialRes));
@@ -242,7 +248,7 @@ void ofApp::setUniforms(ofShader* shader) {
 	// Screen Resolution
 	shader->setUniform2f("_res", ofVec2f(ofGetWidth(), ofGetHeight()));
 	// Frame resolution
-	shader->setUniform2f("_frameRes", ofVec2f(left.getWidth(), left.getHeight()));
+	shader->setUniform2f("_frameRes", ofVec2f(l->getWidth(), l->getHeight()));
 	// Upsampling Factor
 	shader->setUniform1i("_upscale", upscale);
 	
@@ -262,17 +268,22 @@ void ofApp::setUniforms(ofShader* shader) {
 void ofApp::renderShader() {
 	ofSetColor(255);
 
+	//if (bikeTest) {
+	//	ofBackground(255);
+	//	return;
+	//}
+
 	if (debugCalibrate) {
 		activeShader = &calibration;
 	}
-	else if (debugShowInterlaced) {
+	else if (debugShowInterlaced || bikeTest) {
 		if (resample) {
 			activeShader = &intResample;
 		}
 		else {
 			activeShader = &interlacer;
 		}
-	} 
+	}
 
 	activeShader->begin();
 	// uniforms must be set AFTER beginning the shader
