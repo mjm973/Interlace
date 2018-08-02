@@ -32,8 +32,8 @@ in vec2 texCoord;
 out vec4 color;
 
 // Computes the physical position of a fragment (in mm)
-float computePixelPosition() {
-  return gl_FragCoord.x / _screenDPMM;
+float computePixelPosition(int offset) {
+  return (gl_FragCoord.x + offset) / _screenDPMM;
 }
 
 // Computes the transformed U coordinate for texture sampling
@@ -95,28 +95,41 @@ vec4 bicubic(sampler2DRect tex, vec2 texcoord, vec2 texscale) {
 
 // Downsamples textures to match lenticular resolution using bicubic interpolation
 vec4 downsampleTexture(sampler2DRect tex, vec2 uv) {
-  vec4 col;
-  vec2 coords = uv * _res;
+  vec2 coords = uv;// * _res;
+  // coords.x *= 2;
 
-  return bicubic(tex, coords, vec2(0.5, 1));
+  return bicubic(tex, coords, vec2(1, 1));
 }
 
 void main() {
-  // Figure out physical position of the pixel
-  float x = computePixelPosition();
-  // Compute horizontal image sampling point for that pixel
-  float u = computeU(x);
-  // Compute which slice of the lighfield to render
-  float s = computeS(x, u);
-  float index = round(s);
-  // Update UV sampling coordinates - Y is unaffected
-  vec2 uv = vec2(u * _resAngSpat.x / _res.x, 1 - texCoord.y) * _frameRes;
-  // Test validity of the pixel
-  float valid = u >= 1 && u <= _resAngSpat.y ? 1 : 0;
+  // Anti-aliasing requires sampling different points
+  // Start at nothing
+  color = vec4(0, 0, 0, 0);
+  // We sample one time per upscaling level.
+  for (int i = 0; i < _upscale; ++i) {
+    // Figure out physical position of the pixel
+    float x = computePixelPosition(i);
+    // Compute horizontal image sampling point for that pixel
+    float u = computeU(x);
+    // Compute which slice of the lighfield to render
+    float s = computeS(x, u);
+    float index = round(s);
+    // Update UV sampling coordinates - Y is unaffected
+    vec2 uv = vec2(u * _resAngSpat.x / _res.x, 1 - texCoord.y) * _frameRes;
+    // Test validity of the pixel
+    float valid = u >= 1 && u <= _resAngSpat.y ? 1 : 0;
 
-  // Sample L/R frames
-  vec4 lCol = downsampleTexture(_left, uv);
-  vec4 rCol = downsampleTexture(_right, uv);
+    // Sample L/R frames
+    vec4 lCol = downsampleTexture(_left, uv);
+    vec4 rCol = downsampleTexture(_right, uv);
 
-  color = mix(lCol, rCol, s / _resAngSpat.x) * valid;
+    // Get color for the fragment
+    vec4 c = mix(lCol, rCol, s / _resAngSpat.x) * valid;
+
+    // Add that to our running count
+    color += c;
+  }
+
+  // Divide by upscale factor
+  color /= _upscale;
 }
