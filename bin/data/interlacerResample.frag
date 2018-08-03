@@ -25,6 +25,9 @@ uniform int _upscale;
 // Lenticular Lens Width and Offset
 uniform vec2 _lentWidthOff;
 
+// View Position
+uniform vec3 _viewPos;
+
 // Raw UV Coordinates
 in vec2 texCoord;
 
@@ -101,10 +104,17 @@ vec4 downsampleTexture(sampler2DRect tex, vec2 uv) {
   return bicubic(tex, coords, vec2(1, 1));
 }
 
+int getViewable(float i) {
+  float rightIndex = round(mix(0, _resAngSpat.x, _viewPos.x * 0.5 + 0.5));
+  return rightIndex == i ? 1 : 0;
+}
+
 void main() {
   // Anti-aliasing requires sampling different points
   // Start at nothing
   color = vec4(0, 0, 0, 0);
+
+
   // We sample one time per upscaling level.
   for (int i = 0; i < _upscale; ++i) {
     // Figure out physical position of the pixel
@@ -114,6 +124,11 @@ void main() {
     // Compute which slice of the lighfield to render
     float s = computeS(x, u);
     float index = round(s);
+
+    int viewable = getViewable(index);
+    if (viewable == 0) {
+      break;
+    }
     // Update UV sampling coordinates - Y is unaffected
     vec2 uv = vec2(u * _resAngSpat.x / _res.x, 1 - texCoord.y) * _frameRes;
     // Test validity of the pixel

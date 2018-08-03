@@ -1,3 +1,6 @@
 *.opendb
 .vs
 *.exe
+*.pdb
+*.obj
+*.tlog

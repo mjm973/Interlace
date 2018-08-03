@@ -256,12 +256,12 @@ void ofApp::setUniforms(ofShader* shader) {
 	shader->setUniform2f("_lentWidthOff", ofVec2f(lenticular.lensWidth, lenticular.offset));
 
 	// Viewer Position
-	ofVec2f placement = ofVec2f(0, 0);
+	ofVec3f placement = ofVec3f(0, 0, 0);
 	if (debugPlacement) {
 		placement.x = viewX;
-		placement.y = viewDistance;
+		placement.z = viewDistance;
 	}
-	shader->setUniform2f("_viewXDist", placement);
+	shader->setUniform3f("_viewPos", placement);
 }
 
 // Renders the currently selected shader
