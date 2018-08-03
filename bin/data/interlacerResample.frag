@@ -106,7 +106,7 @@ vec4 downsampleTexture(sampler2DRect tex, vec2 uv) {
 
 int getViewable(float i) {
   float rightIndex = round(mix(0, _resAngSpat.x, _viewPos.x * 0.5 + 0.5));
-  return rightIndex == i ? 1 : 0;
+  return abs(rightIndex - i) < 1.5 ? 1 : 0;
 }
 
 void main() {
