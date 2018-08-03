@@ -139,7 +139,8 @@ void main() {
     vec4 rCol = downsampleTexture(_right, uv);
 
     // Get color for the fragment
-    vec4 c = mix(lCol, rCol, s / _resAngSpat.x) * valid;
+    // vec4 c = mix(lCol, rCol, s / _resAngSpat.x) * valid;
+    vec4 c = s / _resAngSpat.x < 0.5 ? lCol : rCol;
 
     // Add that to our running count
     color += c;
