@@ -109,11 +109,26 @@ vec4 downsampleTexture(sampler2DRect tex, vec2 uv) {
   return bicubic(tex, coords, vec2(1, 1));
 }
 
+// Determines whether our viewpoint requires L/R to be flipped to retain stereo
+float getStereoFlip() {
+  // Split X range [-1, 1] by lightfield index
+  float dx = 2 / _resAngSpat.x;
+  // Determine which "index boundary" we are closest to
+  int boundary = int(floor(_viewPos.x / dx));
+  // Flippy result
+  return boundary % 2 == 0 ? 1.0 : -1.0;
+}
+
+// Determines whether a particular lightfield index should be viewable from our current position
 float getViewable(float i) {
   // Find closest lightfield index based on horizontal position
   float rightIndex = round(mix(0, _resAngSpat.x, _viewPos.x * 0.5 + 0.5));
   // Find difference between fragment index and ideal index
-  return abs(rightIndex - i) < 2.5 ? rightIndex - i : 999;
+  float delta = rightIndex - i;
+  // Flip return value when needed to preserve proper L/R stereo
+  float val = delta * getStereoFlip();
+  // Return proper value if viewable, 999 otherwise
+  return abs(delta) < 2.5 ? rightIndex - i : 999;
 }
 
 void main() {
