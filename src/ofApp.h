@@ -35,20 +35,23 @@ class ofApp : public ofBaseApp{
 	public:
 		ofxPanel gui;
 		ofxButton fs;
-		ofxToggle debugCalibrate;
-		ofxToggle debugShowInterlaced;
-		ofxToggle bikeTest;
+		ofxToggle enableCalibrate;
+		ofxToggle enableDisplay;
 
 		ofxPanel calGui;
+		ofxToggle debugCalibrate;
 		ofxToggle lockParams;
 		ofxSlider<int> upscale;
 		ofxSlider<float> screenSize;
 		ofxSlider<int> lenticularLPI;
 		ofxSlider<float> lenticularOff;
+		ofxToggle spreadX;
 		ofxToggle debugPrint;
 		ofxToggle debugShowLens;
 
 		ofxPanel displayGui;
+		ofxToggle debugShowInterlaced;
+		ofxToggle bikeTest;
 		ofxToggle resample;
 		ofxToggle debugPlacement;
 		ofxSlider<float> viewX;

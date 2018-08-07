@@ -10,25 +10,30 @@ void ofApp::setup() {
 	gui.setup("Mode");
 	gui.add(fs.setup("Toggle Fullscreen"));
 	fs.addListener(this, &ofApp::toggleFS);
-	gui.add(lockParams.setup("Lock Calib.", false));
-	gui.add(debugCalibrate.setup("Calibrate", false));
-	gui.add(debugShowInterlaced.setup("Debug Interlaced", false));
-	gui.add(bikeTest.setup("BIKE", false));
+	gui.add(enableCalibrate.setup("Calib. GUI", true));
+	gui.add(enableDisplay.setup("Disp. GUI", true));
 
 	// Calibration GUI
 	calGui.setup("Calibration");
 	calGui.setPosition(gui.getPosition() + ofVec2f(0, gui.getHeight() + 20));
-	calGui.add(debugPrint.setup("Debug Print", false));
-	calGui.add(debugShowLens.setup("Debug Lenticular", false));
+	calGui.add(lockParams.setup("Lock Calib.", false));
+	calGui.add(debugCalibrate.setup("Calibrate", false));
 
 	calGui.add(upscale.setup("Upscaling", 1, 1, 10));
 	calGui.add(screenSize.setup("Scr. Size", 15.4, 12, 50));
 	calGui.add(lenticularLPI.setup("Lent. LPI", 30, 10, 60));
 	calGui.add(lenticularOff.setup("Lent. Offset", 0.5, 0, 1));	
+	calGui.add(spreadX.setup("Spread X", false));
+
+	calGui.add(debugPrint.setup("Debug Print", false));
+	calGui.add(debugShowLens.setup("Debug Lenticular", false));
 
 	// Positioning GUI
 	displayGui.setup("View Params");
 	displayGui.setPosition(gui.getPosition() + ofVec2f(0, gui.getHeight() + 20));
+	displayGui.add(debugShowInterlaced.setup("Debug Interlaced", false));
+	displayGui.add(bikeTest.setup("BIKE", false));
+
 	displayGui.add(resample.setup("Resample", true));
 	displayGui.add(debugPlacement.setup("Fake Placement", false));
 	displayGui.add(viewX.setup("View X", 0, -1, 1));
@@ -108,10 +113,16 @@ void ofApp::draw() {
 	// Draw relevant GUI
 	gui.draw();
 
-	if (debugCalibrate) {
+	if (enableCalibrate) {
 		calGui.draw();
+
+		displayGui.setPosition(calGui.getPosition() + ofVec2f(0, calGui.getHeight() + 20));
 	}
-	else if (debugShowInterlaced) {
+	else {
+		displayGui.setPosition(gui.getPosition() + ofVec2f(0, gui.getHeight() + 20));
+
+	}
+	if (enableDisplay) {
 		displayGui.draw();
 	}
 }
@@ -262,6 +273,9 @@ void ofApp::setUniforms(ofShader* shader) {
 		placement.z = viewDistance;
 	}
 	shader->setUniform3f("_viewPos", placement);
+	// Enable Position-Based Interlacing
+	int p = spreadX ? 1 : 0;
+	shader->setUniform1i("_positional", p);
 }
 
 // Renders the currently selected shader

@@ -39,7 +39,7 @@ float computePixelPosition(int offset) {
   return (gl_FragCoord.x + offset) / _screenDPMM;
 }
 
-// Computes the transformed U coordinate for texture sampling
+// Computes the corresponding lens for this fragment
 float computeU(float x) {
   float u = floor((x - _lentWidthOff.x * _lentWidthOff.y)/_lentWidthOff.x) + 1;
   return u;
@@ -47,10 +47,15 @@ float computeU(float x) {
 
 // Computes a fragment's corresponding lightfield index
 float computeS(float x, float u) {
+  // Correct lens offset <mm>
   float s = x - _lentWidthOff.x * _lentWidthOff.y;
+  // Shift out whole lenses <mm>
   s -= _lentWidthOff.x * u;
+  // Add half a lens to center position: value should now be between -lensWidth/2, lensWidth/2 <mm>
   s += _lentWidthOff.x * 0.5;
+  // Flip and convert to index: range between resAng/2 to -resAng/2 < >
   s *= -_resAngSpat.x/_lentWidthOff.x;
+  // Push index back to expected range: resAng to 0
   s += (_resAngSpat.x + 1)*0.5;
   return s;
 }
@@ -104,9 +109,11 @@ vec4 downsampleTexture(sampler2DRect tex, vec2 uv) {
   return bicubic(tex, coords, vec2(1, 1));
 }
 
-int getViewable(float i) {
+float getViewable(float i) {
+  // Find closest lightfield index based on horizontal position
   float rightIndex = round(mix(0, _resAngSpat.x, _viewPos.x * 0.5 + 0.5));
-  return abs(rightIndex - i) < 1.5 ? 1 : 0;
+  // Find difference between fragment index and ideal index
+  return abs(rightIndex - i) < 2.5 ? rightIndex - i : 999;
 }
 
 void main() {
@@ -125,8 +132,8 @@ void main() {
     float s = computeS(x, u);
     float index = round(s);
 
-    int viewable = getViewable(index);
-    if (viewable == 0) {
+    float viewable = getViewable(index);
+    if (viewable == 999) {
       break;
     }
     // Update UV sampling coordinates - Y is unaffected
@@ -140,7 +147,8 @@ void main() {
 
     // Get color for the fragment
     // vec4 c = mix(lCol, rCol, s / _resAngSpat.x) * valid;
-    vec4 c = s / _resAngSpat.x < 0.5 ? lCol : rCol;
+    vec4 c = viewable < 0 ? lCol : rCol;
+    // vec4 c = s < index ? lCol : rCol;
 
     // Add that to our running count
     color += c;

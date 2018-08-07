@@ -36,7 +36,7 @@ float computePixelPosition() {
   return gl_FragCoord.x / _screenDPMM;
 }
 
-// Computes the transformed U coordinate for texture sampling
+// Computes the corresponding lens for this fragment
 float computeU(float x) {
   float u = floor((x - _lentWidthOff.x * _lentWidthOff.y)/_lentWidthOff.x) + 1;
   return u;
@@ -44,10 +44,15 @@ float computeU(float x) {
 
 // Computes a fragment's corresponding lightfield index
 float computeS(float x, float u) {
+  // Correct lens offset <mm>
   float s = x - _lentWidthOff.x * _lentWidthOff.y;
+  // Shift out whole lenses <mm>
   s -= _lentWidthOff.x * u;
+  // Add half a lens to center position: value should now be between -lensWidth/2, lensWidth/2 <mm>
   s += _lentWidthOff.x * 0.5;
+  // Flip and convert to index: range between resAng/2 to -resAng/2 < >
   s *= -_resAngSpat.x/_lentWidthOff.x;
+  // Push index back to expected range: resAng to 0
   s += (_resAngSpat.x + 1)*0.5;
   return s;
 }
