@@ -112,9 +112,9 @@ vec4 downsampleTexture(sampler2DRect tex, vec2 uv) {
 // Determines whether our viewpoint requires L/R to be flipped to retain stereo
 float getStereoFlip() {
   // Split X range [-1, 1] by lightfield index
-  float dx = 1 / _resAngSpat.x;
+  float dx = 2 / _resAngSpat.x;
   // Determine which "index boundary" we are closest to
-  int boundary = int(floor(_viewPos.x / dx));
+  int boundary = int(floor(_viewPos.x / (dx)));
   // Flippy result
   return boundary % 2 == 0 ? 1.0 : -1.0;
 }
@@ -128,7 +128,7 @@ float getViewable(float i) {
   // Flip return value when needed to preserve proper L/R stereo
   float val = delta * getStereoFlip();
   // Return proper value if viewable, 999 otherwise
-  return abs(delta) < 2.5 ? rightIndex - i : 999;
+  return abs(delta) < 2.5 ? val : 999;
 }
 
 void main() {
