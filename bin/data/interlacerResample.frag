@@ -35,20 +35,20 @@ in vec2 texCoord;
 out vec4 color;
 
 // Computes the physical position of a fragment (in mm)
-float computePixelPosition(int offset) {
-  return (gl_FragCoord.x + offset) / _screenDPMM;
+float computePixelPosition(int pixelOff) {
+  return (gl_FragCoord.x + pixelOff) / _screenDPMM;
 }
 
 // Computes the corresponding lens for this fragment
-float computeU(float x) {
-  float u = floor((x - _lentWidthOff.x * _lentWidthOff.y)/_lentWidthOff.x) + 1;
+float computeU(float x, float off) {
+  float u = floor((x - _lentWidthOff.x * off)/_lentWidthOff.x) + 1;
   return u;
 }
 
 // Computes a fragment's corresponding lightfield index
-float computeS(float x, float u) {
+float computeS(float x, float u, float off) {
   // Correct lens offset <mm>
-  float s = x - _lentWidthOff.x * _lentWidthOff.y;
+  float s = x - _lentWidthOff.x * off;
   // Shift out whole lenses <mm>
   s -= _lentWidthOff.x * u;
   // Add half a lens to center position: value should now be between -lensWidth/2, lensWidth/2 <mm>
@@ -110,41 +110,66 @@ vec4 downsampleTexture(sampler2DRect tex, vec2 uv) {
 }
 
 // Determines whether our viewpoint requires L/R to be flipped to retain stereo
+// Possibly unused
 float getStereoFlip() {
   // Split X range [-1, 1] by lightfield index
   float dx = 2 / _resAngSpat.x;
   // Determine which "index boundary" we are closest to
   int boundary = int(floor(_viewPos.x / (dx)));
   // Flippy result
+  return 1.0;
   return boundary % 2 == 0 ? 1.0 : -1.0;
 }
 
 // Determines whether a particular lightfield index should be viewable from our current position
 float getViewable(float i) {
-  // Find closest lightfield index based on horizontal position
-  float rightIndex = round(mix(0, _resAngSpat.x, _viewPos.x * 0.5 + 0.5));
-  // Find difference between fragment index and ideal index
-  float delta = rightIndex - i;
-  // Flip return value when needed to preserve proper L/R stereo
-  float val = delta * getStereoFlip();
-  // Return proper value if viewable, 999 otherwise
-  return abs(delta) < 2.5 ? val : 999;
+  // Ver 1. :: Blacking out invisible lightfields
+  // // Find closest lightfield index based on horizontal position
+  // float rightIndex = round(mix(0, _resAngSpat.x, _viewPos.x * 0.5 + 0.5));
+  // // Find difference between fragment index and ideal index
+  // float delta = rightIndex - i;
+  // // Flip return value when needed to preserve proper L/R stereo
+  // float val = delta * getStereoFlip();
+  // // Return proper value if viewable, 999 otherwise
+  // //return abs(delta) < 2.5 ? val : val; //999;
+
+  // Ver 2. :: Uniform for all angles
+  // return float(sign(_resAngSpat.x*0.5 - i)*getStereoFlip());
+
+  // Ver 3. :: Uniform and weighted
+  return float((_resAngSpat.x * 0.5 - i) * getStereoFlip() / (_resAngSpat.x * 0.5));
+}
+
+vec4 mixFrames(vec2 uv, float view) {
+  // Sample L/R frames
+  vec4 lCol = downsampleTexture(_left, uv);
+  vec4 rCol = downsampleTexture(_right, uv);
+
+  // === Get color for the fragment ===
+  // == 1. Binary left/right
+  // return view < 0 ? lCol : rCol;
+
+  // == 2. Smoothstep to aid transitions
+  return mix(lCol, rCol, smoothstep(0, 1, view * 0.5 + 0.5));
 }
 
 void main() {
+  // Using our view position and calibration lens offset, compute a virtual offset
+  // This will allow us to stop the image from flipping when moving between sweet spots
+  float offset = _lentWidthOff.y + _viewPos.x * 0.5;
+
   // Anti-aliasing requires sampling different points
   // Start at nothing
   color = vec4(0, 0, 0, 0);
-
 
   // We sample one time per upscaling level.
   for (int i = 0; i < _upscale; ++i) {
     // Figure out physical position of the pixel
     float x = computePixelPosition(i);
     // Compute horizontal image sampling point for that pixel
-    float u = computeU(x);
+    float u = computeU(x, offset);
     // Compute which slice of the lighfield to render
-    float s = computeS(x, u);
+    float s = computeS(x, u, offset);
     float index = round(s);
 
     float viewable = getViewable(index);
@@ -156,14 +181,7 @@ void main() {
     // Test validity of the pixel
     float valid = u >= 1 && u <= _resAngSpat.y ? 1 : 0;
 
-    // Sample L/R frames
-    vec4 lCol = downsampleTexture(_left, uv);
-    vec4 rCol = downsampleTexture(_right, uv);
-
-    // Get color for the fragment
-    // vec4 c = mix(lCol, rCol, s / _resAngSpat.x) * valid;
-    vec4 c = viewable < 0 ? lCol : rCol;
-    // vec4 c = s < index ? lCol : rCol;
+    vec4 c = mixFrames(uv, viewable);
 
     // Add that to our running count
     color += c;
