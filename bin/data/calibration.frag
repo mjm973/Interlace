@@ -20,8 +20,8 @@ uniform vec2 _res;
 // Upsampling factor
 uniform int _upscale;
 
-// Lentigular Lens Width and Offset
-uniform vec2 _lentWidthOff;
+// Lenticular Lens Width, Offset, and Thickness (x, y, z)
+uniform vec3 _lentWidthOff;
 
 // View Position
 uniform vec3 _viewPos;

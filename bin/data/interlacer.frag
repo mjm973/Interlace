@@ -22,8 +22,8 @@ uniform vec2 _frameRes;
 // Upsampling factor
 uniform int _upscale;
 
-// Lenticular Lens Width and Offset
-uniform vec2 _lentWidthOff;
+// Lenticular Lens Width, Offset, and Thickness (x, y, z)
+uniform vec3 _lentWidthOff;
 
 // Raw UV Coordinates
 in vec2 texCoord;

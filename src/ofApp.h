@@ -9,9 +9,13 @@ class ofApp : public ofBaseApp{
 		int vRes;
 		float size;
 		float width;
+		float height;
 		float dotsPerInch;
 		float dotsPerMM;
-		vector<float> pixelCenters;
+		//vector<float> pixelCenters;
+		ofVec3f cornerA;
+		ofVec3f cornerB;
+		ofVec3f cornerC;
 	} Screen;
 
 	typedef struct {
@@ -19,6 +23,7 @@ class ofApp : public ofBaseApp{
 		float linesPerMM;
 		float lensWidth;
 		float offset;
+		float thickness;
 	} Lenticular;
 
 	typedef struct {
@@ -37,6 +42,7 @@ class ofApp : public ofBaseApp{
 		ofxButton fs;
 		ofxToggle enableCalibrate;
 		ofxToggle enableDisplay;
+		ofxToggle testProjection;
 
 		ofxPanel calGui;
 		ofxToggle debugCalibrate;
@@ -45,6 +51,7 @@ class ofApp : public ofBaseApp{
 		ofxSlider<float> screenSize;
 		ofxSlider<int> lenticularLPI;
 		ofxSlider<float> lenticularOff;
+		ofxSlider<float> lenticularThickness;
 		ofxToggle spreadX;
 		ofxToggle debugPrint;
 		ofxToggle debugShowLens;
@@ -55,7 +62,10 @@ class ofApp : public ofBaseApp{
 		ofxToggle resample;
 		ofxToggle debugPlacement;
 		ofxSlider<float> viewX;
-		ofxSlider<float> viewDistance;
+		ofxSlider<float> viewY;
+		ofxSlider<float> viewZ;
+		ofxSlider<float> nearClip;
+		ofxSlider<float> farClip;
 
 
 		Screen screen;
@@ -63,8 +73,10 @@ class ofApp : public ofBaseApp{
 		Lightfield lf;
 		Map map;
 
+		ofMatrix4x4 projectionMatrix;
+
 		ofImage left, right, bikeL, bikeR;
-		ofShader interlacer, intResample, calibration;
+		ofShader interlacer, intResample, calibration, projection;
 		ofShader* activeShader;
 		ofPlanePrimitive plane;
 
@@ -76,6 +88,7 @@ class ofApp : public ofBaseApp{
 		Lenticular initLenticular();
 		Lightfield initLightfield();
 		Map initMap();
+		ofMatrix4x4 computeProjectionMatrix();
 
 		void debugLens();
 		void printParams();

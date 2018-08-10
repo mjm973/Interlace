@@ -12,6 +12,7 @@ void ofApp::setup() {
 	fs.addListener(this, &ofApp::toggleFS);
 	gui.add(enableCalibrate.setup("Calib. GUI", true));
 	gui.add(enableDisplay.setup("Disp. GUI", true));
+	gui.add(testProjection.setup("Test Projection", false));
 
 	// Calibration GUI
 	calGui.setup("Calibration");
@@ -23,6 +24,7 @@ void ofApp::setup() {
 	calGui.add(screenSize.setup("Scr. Size", 15.4, 12, 50));
 	calGui.add(lenticularLPI.setup("Lent. LPI", 30, 10, 60));
 	calGui.add(lenticularOff.setup("Lent. Offset", 0.5, 0, 1));	
+	calGui.add(lenticularThickness.setup("Lent. Thickness", 5, 0.5, 20));
 	calGui.add(spreadX.setup("Spread X", false));
 
 	calGui.add(debugPrint.setup("Debug Print", false));
@@ -37,7 +39,10 @@ void ofApp::setup() {
 	displayGui.add(resample.setup("Resample", true));
 	displayGui.add(debugPlacement.setup("Fake Placement", false));
 	displayGui.add(viewX.setup("View X", 0, -1, 1));
-	displayGui.add(viewDistance.setup("View Distance", 1.5, 1, 3));
+	displayGui.add(viewY.setup("View Y", 0, -1, 1));
+	displayGui.add(viewZ.setup("View Distance", 1.5, -10, 10));
+	displayGui.add(nearClip.setup("Near Clipping", 2, 0, 10));
+	displayGui.add(farClip.setup("Far Clipping", 10, 0, 20));
 
 	// Initialize Screen, Lenticular, and Lightfield parameters
 	screen = initScreen();
@@ -65,6 +70,7 @@ void ofApp::setup() {
 		interlacer.load("interlacer");
 		intResample.load("interlacerResample");
 		calibration.load("calibration");
+		projection.load("projection");
 	}
 	catch (exception e) {
 		abort = true;
@@ -95,6 +101,10 @@ void ofApp::update() {
 			printParams();
 		}
 	}
+
+	if (testProjection) {
+		projectionMatrix = computeProjectionMatrix();
+	}
 }
 
 //--------------------------------------------------------------
@@ -106,7 +116,7 @@ void ofApp::draw() {
 		debugLens();
 	}
 	// Does the actual rendering magic
-	else if (debugShowInterlaced || debugCalibrate || bikeTest) {
+	else if (debugShowInterlaced || debugCalibrate || bikeTest || testProjection) {
 		renderShader();
 	}
 
@@ -138,18 +148,26 @@ ofApp::Screen ofApp::initScreen() {
 	s.size = screenSize;
 	// Screen Width - in inches
 	s.width = s.size*cosf(atan2f(ofGetHeight(), ofGetWidth()));
+	s.height = s.size*sinf(atan2f(ofGetHeight(), ofGetWidth()));
 	// Screen Pizel density (DPI and DPMM)
 	s.dotsPerInch = ofGetWidth() / s.width;
 	s.dotsPerMM = inOverMM*s.dotsPerInch;
 
-	vector<float> pix;
-	for (float i = 0; i < upscale*s.hRes - 1; ++i) {
-		float x = (1 / ((float)upscale*screen.dotsPerMM))*i + 0.5;
+	//vector<float> pix;
+	//for (float i = 0; i < upscale*s.hRes - 1; ++i) {
+	//	float x = (1 / ((float)upscale*screen.dotsPerMM))*i + 0.5;
 
-		pix.push_back(x);
-	}
+	//	pix.push_back(x);
+	//}
 
-	s.pixelCenters = pix;
+	//s.pixelCenters = pix;
+
+	float halfW = s.width * 0.5 / (inOverMM * 1000);
+	float halfH = s.height * 0.5 / (inOverMM * 1000);
+
+	s.cornerA = ofVec3f(-halfW, -halfH, 0);
+	s.cornerB = ofVec3f( halfW, -halfH, 0);
+	s.cornerC = ofVec3f(-halfW,  halfH, 0);
 
 	return s;
 }
@@ -165,6 +183,8 @@ ofApp::Lenticular ofApp::initLenticular() {
 	l.lensWidth = 1 / l.linesPerMM;
 	// Number of lenticles offset from the edge of the screen (0 - 1)
 	l.offset = lenticularOff;
+	// Thickness of lenticular sheet - in mm
+	l.thickness = lenticularThickness;
 
 	return l;
 }
@@ -181,28 +201,96 @@ ofApp::Lightfield ofApp::initLightfield() {
 	return l;
 }
 
+// Compute off-axis projection matrix
+ofMatrix4x4 ofApp::computeProjectionMatrix() {
+	// Orthonormal screen basis
+	ofVec3f vr, vu, vn;
+	// Screen coordinates in orthonormal coordinates
+	ofVec3f va, vb, vc;
+	// Perpendicular frustum parameters (left, right, bottom, top, near plane, far plane, distance)
+	float l, r, b, t, n, f, dist;
+	// Our matrix!
+	ofMatrix4x4 mat;
+	// Our view position
+	ofVec3f viewPos = ofVec3f(viewX, viewY, viewZ);
+
+	// Compute basis - r (right), u (up), n (normal)
+	vr = screen.cornerB - screen.cornerA;
+	vr.normalize();
+	vu = screen.cornerC - screen.cornerA;
+	vu.normalize();
+	vn = vr.getCrossed(vu);
+	vn.normalize();
+
+	// Compute viewpoint to corner vectors
+	va = screen.cornerA - viewPos;
+	vb = screen.cornerB - viewPos;
+	vc = screen.cornerC - viewPos;
+
+	// Find distance from viewpoint to screen
+	dist = -va.dot(vn);
+
+	// Compute parameters for perpendicular projection
+	n = nearClip;
+	f = farClip;
+
+	l = vr.dot(va) * n / dist;
+	r = vr.dot(vb) * n / dist;
+	b = vu.dot(va) * n / dist;
+	t = vu.dot(vc) * n / dist;
+
+	// Generate perpendicular projection 
+	mat = ofMatrix4x4(2*n/(r-l)    , 0.0      ,  (r+l)/(r-l),  0.0        ,
+					  0.0          , 2*n/(t-b),  (t+b)/(t-b),  0.0        ,
+					  0.0          , 0.0      , -(f+n)/(f-n), -2*f*n/(f-n),
+					  0.0          , 0.0      , -1          ,  0.0        );
+
+	// test override
+	mat = ofGetCurrentMatrix(ofMatrixMode::OF_MATRIX_PROJECTION);
+
+	// Generate rotation matrix to orient the projection plane
+	ofMatrix4x4 rot = ofMatrix4x4(vr.x, vr.y, vr.z, 0.0,
+								  vu.x, vu.y, vu.z, 0.0,
+								  vn.x, vn.y, vn.z, 0.0,
+								  0.0 , 0.0 , 0.0 , 1.0);
+
+	// Generate translation matrix
+	ofMatrix4x4 trans = ofMatrix4x4(1.0, 0.0, 0.0, -viewPos.x,
+									0.0, 1.0, 0.0, -viewPos.y,
+									0.0, 0.0, 1.0, viewPos.z,
+									0.0, 0.0, 0.0,  1.0      );
+
+	// Multiply and we done!
+	//return mat;
+	//return mat * rot;
+	return mat * rot * trans;
+	//return trans * rot * mat;
+
+	return ofGetCurrentMatrix(ofMatrixMode::OF_MATRIX_PROJECTION);
+}
+
 ofApp::Map ofApp::initMap() {
 	Map m = {};
 
 	vector<int> uMap;
 	vector<int> checkMap;
 	vector<float> sMap;
-	for (int i = 0; i < screen.pixelCenters.size(); ++i) {
-		float u = 1 + (screen.pixelCenters[i] - lenticular.lensWidth * lenticular.offset) / lenticular.lensWidth;
-		u = floorf(u);
-		uMap.push_back((int)floorf(u));
+	//for (int i = 0; i < screen.pixelCenters.size(); ++i) {
+	//	float u = 1 + (screen.pixelCenters[i] - lenticular.lensWidth * lenticular.offset) / lenticular.lensWidth;
+	//	u = floorf(u);
+	//	uMap.push_back((int)floorf(u));
 
-		float s = -lf.angularRes / lenticular.lensWidth;
-		float s1 = screen.pixelCenters[i] - lenticular.lensWidth*lenticular.offset;
-		s1 -= lenticular.lensWidth * (float)u;
-		s1 += lenticular.lensWidth / 2;
-		s *= s1;
-		s += (lf.angularRes + 1) / 2;
+	//	float s = -lf.angularRes / lenticular.lensWidth;
+	//	float s1 = screen.pixelCenters[i] - lenticular.lensWidth*lenticular.offset;
+	//	s1 -= lenticular.lensWidth * (float)u;
+	//	s1 += lenticular.lensWidth / 2;
+	//	s *= s1;
+	//	s += (lf.angularRes + 1) / 2;
 
-		sMap.push_back((int)s);
+	//	sMap.push_back((int)s);
 
-		checkMap.push_back(u >= 1 && u <= lf.spatialRes ? 1 : 0);
-	}
+	//	checkMap.push_back(u >= 1 && u <= lf.spatialRes ? 1 : 0);
+	//}
 
 	m.u = uMap;
 	m.uCheck = checkMap;
@@ -247,6 +335,14 @@ void ofApp::setUniforms(ofShader* shader) {
 	ofImage* l = bikeTest ? &bikeL : &left;
 	ofImage* r = bikeTest ? &bikeR : &right;
 
+	// Projection
+	float mvRaw[16];
+	glGetFloatv(GL_MODELVIEW_MATRIX, mvRaw);
+	//ofMatrix4x4 mv = ofMatrix4x4(mvRaw);
+	ofMatrix4x4 mv = ofGetCurrentMatrix(ofMatrixMode::OF_MATRIX_MODELVIEW);
+
+	shader->setUniformMatrix4f("_modelViewProjection", mv * projectionMatrix);
+
 	// Viewpoints
 	shader->setUniformTexture("_left", l->getTextureReference(), 0);
 	shader->setUniformTexture("_right", r->getTextureReference(), 1);
@@ -264,13 +360,14 @@ void ofApp::setUniforms(ofShader* shader) {
 	shader->setUniform1i("_upscale", upscale);
 	
 	// Lenticular Lens Width and Offset
-	shader->setUniform2f("_lentWidthOff", ofVec2f(lenticular.lensWidth, lenticular.offset));
+	shader->setUniform3f("_lentWidthOff", ofVec3f(lenticular.lensWidth, lenticular.offset, lenticular.thickness));
 
 	// Viewer Position
 	ofVec3f placement = ofVec3f(0, 0, 0);
 	if (debugPlacement) {
 		placement.x = viewX;
-		placement.z = viewDistance;
+		placement.y = viewY;
+		placement.z = viewZ;
 	}
 	shader->setUniform3f("_viewPos", placement);
 	// Enable Position-Based Interlacing
@@ -297,6 +394,37 @@ void ofApp::renderShader() {
 		else {
 			activeShader = &interlacer;
 		}
+	}
+	else if (testProjection) {
+		activeShader = &projection;
+
+		activeShader->begin();
+		
+
+		ofPushMatrix();
+		ofTranslate(ofGetWidth()*0.5, ofGetHeight()*0.5);
+		
+		//// uniforms must be set AFTER beginning the shader
+		setUniforms(activeShader);
+		
+		of3dPrimitive thing = of3dPrimitive(ofMesh::cone(100, 200));
+		thing.setPosition(0, 0, 1);
+		thing.draw();
+		thing.setPosition(0, 0, -1);
+		thing.draw();
+		thing.setPosition(0, 1, 0);
+		thing.draw();
+		thing.setPosition(0, -1, 0);
+		thing.draw();
+		thing.setPosition(1, 0, 0);
+		thing.draw();
+		thing.setPosition(-1, 0, 0);
+		thing.draw();
+		//ofDrawRectangle(0, 0, ofGetWidth(), ofGetHeight());
+		ofPopMatrix();
+		activeShader->end();
+
+		return;
 	}
 
 	activeShader->begin();
