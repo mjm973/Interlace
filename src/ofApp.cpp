@@ -363,7 +363,7 @@ void ofApp::setUniforms(ofShader* shader) {
 	shader->setUniform3f("_lentWidthOff", ofVec3f(lenticular.lensWidth, lenticular.offset, lenticular.thickness));
 
 	// Viewer Position
-	ofVec3f placement = ofVec3f(0, 0, 0);
+	ofVec3f placement = ofVec3f(0, 0, 1.5);
 	if (debugPlacement) {
 		placement.x = viewX;
 		placement.y = viewY;
