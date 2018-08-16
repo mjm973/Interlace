@@ -53,6 +53,7 @@ class ofApp : public ofBaseApp{
 		ofxSlider<float> lenticularOff;
 		ofxSlider<float> lenticularThickness;
 		ofxToggle spreadX;
+		ofxToggle debugU;
 		ofxToggle debugPrint;
 		ofxToggle debugShowLens;
 

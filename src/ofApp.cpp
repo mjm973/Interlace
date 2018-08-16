@@ -27,6 +27,7 @@ void ofApp::setup() {
 	calGui.add(lenticularThickness.setup("Lent. Thickness", 5, 0.5, 20));
 	calGui.add(spreadX.setup("Spread X", false));
 
+	calGui.add(debugU.setup("Debug Lens Map", false));
 	calGui.add(debugPrint.setup("Debug Print", false));
 	calGui.add(debugShowLens.setup("Debug Lenticular", false));
 
@@ -373,6 +374,9 @@ void ofApp::setUniforms(ofShader* shader) {
 	// Enable Position-Based Interlacing
 	int p = spreadX ? 1 : 0;
 	shader->setUniform1i("_positional", p);
+	// Enable lens mapping debug
+	int lens = debugU ? 1 : 0;
+	shader->setUniform1i("_showU", lens);
 }
 
 // Renders the currently selected shader
