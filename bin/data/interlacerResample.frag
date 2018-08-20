@@ -39,25 +39,70 @@ float computePixelPosition(int pixelOff) {
   return (gl_FragCoord.x + pixelOff) / _screenDPMM;
 }
 
-// Computes the corresponding lens for this fragment
-float computeU(float x, float off) {
-  float u = floor((x - _lentWidthOff.x * off)/_lentWidthOff.x) + 1;
-  return u;
+// Computes a magic number to evade anti-sweet spots [not yet implemented]
+float computeStereoOffset() {
+  return _lentWidthOff.y;
 }
 
-// Computes a fragment's corresponding lightfield index
-float computeS(float x, float u, float off) {
-  // Correct lens offset <mm>
-  float s = x - _lentWidthOff.x * off;
-  // Shift out whole lenses <mm>
-  s -= _lentWidthOff.x * u;
-  // Add half a lens to center position: value should now be between -lensWidth/2, lensWidth/2 <mm>
-  s += _lentWidthOff.x * 0.5;
-  // Flip and convert to index: range between resAng/2 to -resAng/2 < >
-  s *= -_resAngSpat.x/_lentWidthOff.x;
-  // Push index back to expected range: resAng to 0
-  s += (_resAngSpat.x + 1)*0.5;
-  return s;
+// Computes center lens and lens offset for the fragment
+vec2 computeLens(float x, float stereo) {
+  // Better better approach: discard the naive approach altogether and do the proper math
+
+  // First, find our offset from the view center
+  // :: Find center of the screen
+  float center = 0.5 * _res.x / _screenDPMM;
+  // :: Compute offset - view position is center when viewX is 0
+  float viewX = _viewPos.x * 1000 + center;
+  float dx = x - viewX;
+  // Second, find the lens directly under our viewpoint. The naive approach will work here.
+  float u0 = (viewX - _lentWidthOff.x * _lentWidthOff.y) / _lentWidthOff.x;
+  // Third, use similar triangles to find offset on the lenticular sheet!
+  float dLent = dx * (_viewPos.z * 1000 - _lentWidthOff.z) / (_viewPos.z * 1000);
+  // Fourth, find how many lenses we are off from the center lens
+  float du = dLent / _lentWidthOff.x;
+  // Finally, return u0 and du
+  return vec2(u0, du);
+}
+
+float computeLightfield(float x, vec2 u, float stereo) {
+  // Attempt 4: Just like with u, recalculate from scratch
+  // The earlier aproach assumes we will have lightfields 1~N spread across the
+  // width of the lens. This is inaccurate, as the lens has a thickness, so the
+  // lightfields must be spread across a slighty wider area.
+  // First, find the screen middle of the view-axis lens
+  // :: Calculate center lens center :: <mm>
+  // :: Don't forget to account for lens offset
+  float u0 = u.x;
+  float du = u.y;
+  float uCenter0 = _lentWidthOff.x * (floor(u0) + 0.5 + _lentWidthOff.y);
+  // :: Calculate center lens center projected on screen
+  // :::: As u0 lies directly under the viewpoint, we can assume uCenter0 ~= uScreen0
+  float uScreen0 = uCenter0;
+  float center = 0.5 * _res.x / _screenDPMM;
+  // :: Compute offset - view position is center when viewX is 0
+  float viewX = _viewPos.x * 1000 + center;
+  float dLens = uCenter0 - viewX;
+  float dScreen = dLens * _viewPos.z * 1000 / (_viewPos.z * 1000 - _lentWidthOff.z);
+  uScreen0 = viewX + dScreen;
+  // Second, find the screen center of our current lens
+  // :: Calculate screen width covered by lens (should be slightly more than lens width) :: <mm>
+  float w = _viewPos.z * 1000 * _lentWidthOff.x / (_viewPos.z * 1000 - _lentWidthOff.z);
+  // :: Find our current lens screen center <mm>
+  float uScreen = uScreen0 + round(du) * w;
+  // return abs(uScreen0 - x) < _viewPos.y || abs(uScreen - x) < _viewPos.y ? 1.0 : 0;
+  // Third, compute the lightfield index based on the center and pixel position
+  // :: Compute difference between lens screen center and our position :: <mm> {right is positive}
+  float dcenter = viewX - uScreen0;
+  float ds = x - uScreen - dcenter;
+  // :: At this point, ds falls between [-w/2, w/2]
+  // :: Flip and map to index
+  // :: ds should fall between [resAng/2, -resAng/2]
+  ds *= -_resAngSpat.x / w;
+  // :: Push back to lightfield range
+  // :: ds should finally fall between [resAng, 0]
+  ds += (_resAngSpat.x) * 0.5;
+
+  return ds;
 }
 
 
@@ -156,7 +201,7 @@ vec4 mixFrames(vec2 uv, float view) {
 void main() {
   // Using our view position and calibration lens offset, compute a virtual offset
   // This will allow us to stop the image from flipping when moving between sweet spots
-  float offset = _lentWidthOff.y + _viewPos.x * 0.5;
+  float offset = computeStereoOffset();//_lentWidthOff.y + _viewPos.x * 0.5;
 
   // Anti-aliasing requires sampling different points
   // Start at nothing
@@ -167,9 +212,10 @@ void main() {
     // Figure out physical position of the pixel
     float x = computePixelPosition(i);
     // Compute horizontal image sampling point for that pixel
-    float u = computeU(x, offset);
+    vec2 u = computeLens(x, offset);
+    float uf = floor(u.x + u.y) + 1;
     // Compute which slice of the lighfield to render
-    float s = computeS(x, u, offset);
+    float s = computeLightfield(x, u, offset);
     float index = round(s);
 
     float viewable = getViewable(index);
@@ -177,9 +223,9 @@ void main() {
       break;
     }
     // Update UV sampling coordinates - Y is unaffected
-    vec2 uv = vec2(u * _resAngSpat.x / _res.x, 1 - texCoord.y) * _frameRes;
+    vec2 uv = vec2(uf * _resAngSpat.x / _res.x, 1 - texCoord.y) * _frameRes;
     // Test validity of the pixel
-    float valid = u >= 1 && u <= _resAngSpat.y ? 1 : 0;
+    float valid = 1;//u >= 1 && u <= _resAngSpat.y ? 1 : 0;
 
     vec4 c = mixFrames(uv, viewable);
 

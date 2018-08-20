@@ -33,7 +33,7 @@ uniform int _positional;
 uniform int _showU;
 
 // Raw UV Coordinates
-in vec2 texcoord;
+in vec2 texCoord;
 
 // Output Pixel Color
 out vec4 color;
@@ -114,25 +114,36 @@ float computeLightfield(float x, float u0, float du) {
   // lightfields must be spread across a slighty wider area.
   // First, find the screen middle of the view-axis lens
   // :: Calculate center lens center :: <mm>
-  float uCenter0 = _lentWidthOff.x * (floor(u0) + 0.5);
+  // :: Don't forget to account for lens offset
+  float uCenter0 = _lentWidthOff.x * (floor(u0) + 0.5 + _lentWidthOff.y);
   // :: Calculate center lens center projected on screen
   // :::: As u0 lies directly under the viewpoint, we can assume uCenter0 ~= uScreen0
   float uScreen0 = uCenter0;
+  float center = 0.5 * _res.x / _screenDPMM;
+  // :: Compute offset - view position is center when viewX is 0
+  float viewX = _viewPos.x * 1000 + center;
+  float dLens = uCenter0 - viewX;
+  float dScreen = dLens * _viewPos.z * 1000 / (_viewPos.z * 1000 - _lentWidthOff.z);
+  uScreen0 = viewX + dScreen;
   // Second, find the screen center of our current lens
   // :: Calculate screen width covered by lens (should be slightly more than lens width) :: <mm>
   float w = _viewPos.z * 1000 * _lentWidthOff.x / (_viewPos.z * 1000 - _lentWidthOff.z);
   // :: Find our current lens screen center <mm>
   float uScreen = uScreen0 + round(du) * w;
-  // NOTE :::::: MAKES SENSE UP TO HERE ::::::
+  // return abs(uScreen0 - x) < _viewPos.y || abs(uScreen - x) < _viewPos.y ? 1.0 : 0;
   // Third, compute the lightfield index based on the center and pixel position
   // :: Compute difference between lens screen center and our position :: <mm> {right is positive}
-  float ds = x - uScreen;
-  // return ds;
-  // return ds / w;
+  float dcenter = viewX - uScreen0;
+  float ds = x - uScreen - dcenter;
+  // :: At this point, ds falls between [-w/2, w/2]
+  // NOTE :::::: MAKES SENSE UP TO HERE ::::::
+  // return ds * 2 / w; // [-1, 1]
   // :: Flip and map to index
+  // :: ds should fall between [resAng/2, -resAng/2]
   ds *= -_resAngSpat.x / w;
   // :: Push back to lightfield range
-  ds += (_resAngSpat.x ) * 0.5;
+  // :: ds should finally fall between [resAng, 0]
+  ds += (_resAngSpat.x) * 0.5;
 
   // ds = clamp(ds, 0, _resAngSpat.x);
 
@@ -261,8 +272,14 @@ float computeLightfield(float x, float u0, float du) {
 // }
 
 // Computes fragment color for the calibration pattern
-vec4 calibColor(int i) {
+vec4 calibColor(float i) {
   float val = i == round((_resAngSpat.x + 1)*0.5) ? 1 : 0;
+  float d =  i - (_resAngSpat.x + 1) * 0.5;
+  val = i / _resAngSpat.x; // [resAng, 0] -> [1, 0]
+  // return abs(i) < _viewPos.y ? vec4(1, 0, 0, 1) : i > 0 ? vec4(0, 1, 0, 1) : vec4(0, 0, 1, 1);
+
+  // 1 if i is close to resAng/2; 0 otherwise
+  val = abs(i - round((_resAngSpat.x)*0.5)) < _viewPos.y ? 1 : 0;
 
   return vec4(val, val, val, 1);
 }
@@ -270,21 +287,19 @@ vec4 calibColor(int i) {
 void main() {
   // Figure out physical position of the pixel
   float x = computePixelPosition();
-  // Compute horizontal image sampling point for that pixel
-  // float u = computeU(x);
+  // Compute lens corresponding to current fragment
   vec2 u = computeLens(x);
   float u_ = floor(u.x + u.y) + 1;
-  // Compute which slice of the lighfield to render
-  // float s = computeS(x, u);
+  // Compute fragment's lightfield index
   float s = computeLightfield(x, u.x, u.y);
   float index = round(s);
   // Update UV sampling coordinates - Y is unaffected
-  vec2 uv = vec2(u_ / _res.x, texcoord.y);
+  vec2 uv = vec2(u_ / _res.x, texCoord.y);
   // Test validity of the pixel
   float valid = u_ >= 1 && u_ <= _resAngSpat.y ? 1 : 0;
 
   // Generate color
-  color = calibColor(int(index)) * valid;
+  color = calibColor(s);// * valid;
 
   color = _showU == 0 ? color : int(floor(u_)) % 2 == 0 ? vec4(1, 1, 1, 1) : vec4(0, 0, 0, 0);
   // color = vec4(_viewPos)
@@ -294,5 +309,5 @@ void main() {
   // val += round(u) == round((_viewPos.y * 0.5 + 0.5)*_resAngSpat.y) ? 0.5 : 0;
   float val = s;//abs(0.5 + s*0.5);// <= abs(_viewPos.y) ? 1 : 0;
   // val *= 0.07;
-  color = vec4(val, val, val, 1);
+  // color = vec4(val, val, val, 1);
 }
